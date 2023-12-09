@@ -86,10 +86,10 @@ def index():
     
 				# 🔥请求保存到服务器上的图片地址, 跟从网络上请求图片的逻辑一样！然后可以进一步的取保存为 base64 的图片数据
                 # if res:
-                    # res = requests.get(view_image_url) # print("🌟调试:", res.content[:100]) ## 调试：打印响应内容的前几个字节
-                    # img_encode  = Image.open(io.BytesIO(res.content)) # 将图片转换为二进制流
-                    # final_img = encode_pil_to_base64(img_encode) # 把二进制流编码为 base64 的图片数据
-                    # return final_img # 返回编码后的图片数据流 => 图像数据的 Base64 编码。Base64 是一种编码方法，可以将二进制数据转换成 ASCII 字符串
+                #     res = requests.get(view_image_url) # print("🌟调试:", res.content[:100]) ## 调试：打印响应内容的前几个字节
+                #     ima_encode  = Image.open(io.BytesIO(res.content)) # 将图片转换为二进制流
+                #     final_img = encode_pil_to_base64(ima_encode) # 把二进制流编码为 base64 的图片数据
+                #     return final_img # 返回最终解码后的图片数据流 => 图像数据的 Base64 编码。Base64 是一种编码方法，可以将二进制数据转换成 ASCII 字符串
             except Exception as e:
             	return jsonify({"❌ Error": str(e)}), 500
 
