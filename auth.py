@@ -3,6 +3,7 @@ import io
 import json
 import os
 import time
+from flask import jsonify
 from dotenv import load_dotenv # 用来加载环境变量
 from requests_toolbelt import MultipartEncoder
 
@@ -71,23 +72,25 @@ def upload_file_toBase(file_name, full_imageFile_path, tenant_access_token):
     print("📤 开始上传文件...")
     response = requests.request("POST", url, headers=headers, data=multi_form)
     
-    if response.status_code == 200:
-        response_data = response.json()
-		# 返回 file_token
+    try:
+        if response.status_code == 200:
+            response_data = response.json()
+		    # 返回 file_token
 
-		# return response_data
-        file_token = response_data['data']['file_token']  # 提取 file_token
-        print("📤 上传 base 文件成功, file_token 为: \n", file_token, "\n")
-        return file_token
+		    # return response_data
+            file_token = response_data['data']['file_token']  # 提取 file_token
+            print("📤 上传 base 文件成功, file_token 为: \n", file_token, "\n")
+            return file_token
 		
-		# file_token = response_data["file_token"]
-		# print(file_token)
-    else:
-        print("❌ 新增 base 记录失败", response.status_code)
-        return "404"
+		    # file_token = response_data["file_token"]
+		    # print(file_token)
+    except Exception as e:
+        print("❌ 上传 base 记录失败", response.status_code)
+        print("错误详情：", response.text)  # 打印详细的错误信息
+        return jsonify({"error": str(e)}), 500
     
     
-# 新增一条 base 记录
+# 新增一条 base 记录 ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 def add_base_record(file_name, file_token, tenant_access_token):
     app_token = BASE_APP_TOKEN
     table_id = BASE_TABLE_ID
@@ -115,13 +118,106 @@ def add_base_record(file_name, file_token, tenant_access_token):
     response = requests.post(url=url, headers=headers, json=request_body)
     print("📤 开始新增 base 记录...")
     
-    if response.status_code == 200:
-        response_data = response.json()
-        print("📤 新增 base 记录成功: \n", response_data, "\n")
-        return response_data
-    else:
+    try:
+        if response.status_code == 200:
+            response_data = response.json()
+            print("📤 新增 base 记录成功: \n", response_data, "\n")
+            return response_data
+        
+    except Exception as e:
         print("❌ 新增 base 记录失败", response.status_code)
-        return "404"
+        print("错误详情：", response.text)  # 打印详细的错误信息
+        return jsonify({"error": str(e)}), 500
+    
+    
+    
+    
+# 上传图片到 IM 内 ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+def upload_img_toIM(full_imageFile_path, tenant_access_token):
+    url = "https://open.feishu.cn/open-apis/im/v1/images"
+    form = {'image_type': 'message',
+    		'image': (open(full_imageFile_path, 'rb'))}   # 🔥 打开生成好的图片, 并上传到 IM
+    multi_form = MultipartEncoder(form)
+    headers = {
+        "Authorization": "Bearer " + tenant_access_token,
+    }
+    headers['Content-Type'] = multi_form.content_type
+    
+    print("⛰️ 开始上传图片到 IM...")
+    response = requests.request("POST", url, headers=headers, data=multi_form)
+    
+    try:
+        if response.status_code == 200:
+            response_data = response.json()
+            image_key = response_data['data']['image_key']  # 提取 image_key
+            print("⛰️ 获得了 img 的 key:", response.content, "\n")  
+            return image_key
+
+    except Exception as e:
+        print("❌ 图片上传失败", response.status_code)
+        print("错误详情：", response.text)  # 打印详细的错误信息
+        return jsonify({"error": str(e)}), 500
+    
+    
+    
+# 获取用户或机器人所在的群列表 ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+def get_bot_in_group_info(tenant_access_token):
+    url = "https://open.feishu.cn/open-apis/im/v1/chats"
+    headers = {
+		"Authorization": "Bearer " + tenant_access_token,
+	}
+    
+    print("🔍 开始获取机器人所在的群列表...")
+    response = requests.request("GET", url, headers=headers)
+    try:
+        if response.status_code == 200:
+            response_data = response.json()
+            chat_id = response_data["data"]["items"][0]["chat_id"]  # 提取 chat_id
+			
+            print("⛰️ 获得了 bot 所在的 的 chat_id:", response.content, "\n")  
+            return chat_id
+    except Exception as e:
+        print("❌ 群聊消息发送失败", response.status_code)
+        print("错误详情：", response.text)  # 打印详细的错误信息
+        return jsonify({"error": str(e)}), 500
+    
+    
+    
+# 发送消息到指定的群 ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+def send_msg(receive_id, tran_json_string, tenant_access_token):
+    # #真实请求地址: #  url = f"https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id"
+    url = "https://open.feishu.cn/open-apis/im/v1/messages"
+    
+    # 🔥查询参数
+    params = {"receive_id_type": "chat_id"} # 发送到指定的 chat 内
+    
+    headers = {
+		"Authorization": "Bearer " + tenant_access_token,
+  		'Content-Type': 'application/json'
+	}
+    
+     # 构建请求体的字典
+    request_body = {
+		"receive_id": receive_id, # 可以指定 open_id 或 chat_id 或 user_id 等, ⚡️ 这里其实就是传入 chat_id
+  		"msg_type": "interactive",
+		"content": json.dumps(tran_json_string) # 将 Json 转为字符串
+	}
+    
+    payload = json.dumps(request_body)
+       
+    print("💬 准备发送消息到群聊...")
+    response = requests.request("POST", url, params=params, headers=headers, data=payload)
+    
+    try:
+    	if response.status_code == 200:
+            response_data = response.json()
+            print("💬 群聊消息发送成功！:", response_data, "\n")  
+            return jsonify(response_data["data"]) # 使用 jsonify 来返回 JSON 响应
+    except Exception as e:
+        print("❌ 群聊消息发送失败", response.status_code)
+        print("错误详情：", response.text)  # 打印详细的错误信息
+        return jsonify({"error": str(e)}), 500
+    
     
     
     

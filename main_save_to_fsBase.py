@@ -94,15 +94,13 @@ def index():
                 res = check_image_status(prompt_id)
                 res_data = res.get_json() # 在 Flask 中, 当使用 jsonify() 创建一个响应时，实际上是返回了一个 Flask Response 对象, 其中包含了 JSON 格式的字符串作为其数据。要访问这个数据, 需要先检查响应的状态码, 然后解析响应内容为 JSON
                 img_name = res_data["9"]['images'][0]['filename']
-                # view_image_path = f'{url}/view?filename={img_name}' # 🔥 使用view 接口来获取图片信息
-                # print("👍 生成了图片:", view_image_path)
                 print("👍 生成了图片: \n", img_name, "\n")
                 
                 # 获得存放图片的文件夹路径
                 username = getpass.getuser() # 获取当前用户名
                 folder_path = f'/Users/{username}/ComfyUI/output'
                 full_imageFile_path = os.path.join(folder_path, img_name)  # 构建图片的完整路径
-                # return full_imageFile_path ## 🌟返回了图片的绝对地址
+   				 # return full_imageFile_path ## 🌟返回了图片的绝对地址
                 
                 # return view_image_url
                 # 打开文件
@@ -132,7 +130,6 @@ if __name__ == "__main__":
  
     # 开启服务
     app.run(port=5000, debug=True)
-	# Thread(target=lambda: app.run(port=5000, debug=True, use_reloader=False)).start() # 独立开个线程运行服务
  
 
  
