@@ -1,19 +1,34 @@
 import requests 
 import io
+import os
 import json
 import base64
 import time
 import random
+import getpass
+import threading
 from PIL import Image
 from flask import Flask, request, jsonify
 from prompt.prompt import PROMPT
 from threading import Thread
 from datetime import datetime
+from auth import get_tenant_access_token, upload_file_toBase, add_base_record
 
 
 url = "http://127.0.0.1:8188" # comfyUI 的服务器地址
 app = Flask(__name__)
-IMG_ID = None
+
+
+
+# 每隔 1 小时获取一遍 tenant_access_token 的函数
+def get_token_every_90_minutes():
+    global TENAUT_ACCESS_TOKEN
+    while True:
+        TENAUT_ACCESS_TOKEN = get_tenant_access_token()
+        print("⏰ Tenant_access_token 已经刷新为: ", TENAUT_ACCESS_TOKEN)
+        # 等待 1.5 小时 (5400秒)
+        time.sleep(5400)
+
 
 
 # ⌛️ 轮询方法, 等待生图完成
@@ -36,6 +51,7 @@ def decode_base64_to_image(encoding): # 解码图像
     image = Image.open(io.BytesIO(base64.b64decode(encoding)))
     return image
 
+
 def encode_pil_to_base64(image): # 给图像编码
     with io.BytesIO() as output_bytes:
         image.save(output_bytes, format="PNG")
@@ -43,11 +59,11 @@ def encode_pil_to_base64(image): # 给图像编码
     return base64.b64encode(bytes_data).decode("utf-8")
 
 
-@app.route('/generate', methods=['POST']) # 访问 🔥 http://127.0.0.1:5000/generate?text=girl
+
+# 服务的路由
+@app.route('/generateA', methods=['POST']) # 访问 🔥 http://127.0.0.1:5000/generate?text=girl
 def index():
-    # text = request.args.get('text')  # 从查询字符串中获取 text 参数 => 🌟 例如 http://127.0.0.1:5000/generate-image?text=girl
     input_text = request.json.get('text') #  从POST数据中获取text参数
-    # print("拿到了 text :" , input_text)
     
     if not input_text:
         return jsonify({"❌ 缺少 input_text 参数"}), 400
@@ -61,40 +77,67 @@ def index():
         payload = {"prompt": PROMPT} # 准备好要发送的数据, 把提示词替换为传入的提示词
         
         # 发送请求, 开始进入队列进行生图, 接口会返回一个生图队列的 id
+        print("🖌️ 开始生成图片...")
         response = requests.post(url=f'{url}/prompt', json=payload) 
         response_jsonData = response.json() # 不会马上响应, 只会返回个队列 ID , 如果有 id 了则是生成好了图片
-        # return response_jsonData["prompt_id"] # "prompt_id": "024f126e-8457-4b7e-b2ca-1ee5b4e2b4b3"
         
+        print("🔥🔥生图任务:", response_jsonData)
+
         #  获得下发的生图任务 id
-        time.sleep(5)
+        # time.sleep(5)
         prompt_id = response_jsonData["prompt_id"]
-        # print("返回了任务 id: ", prompt_id) ##✅
 
   		# 查看下 output
         if prompt_id:
             try:
-				# time.sleep(20) # 👀要等生图完成了才能获得任务信息？？
-                # 文生图 - 【2 : 获得生图结果】 ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
                 res = ''
                 res = check_image_status(prompt_id)
                 res_data = res.get_json() # 在 Flask 中, 当使用 jsonify() 创建一个响应时，实际上是返回了一个 Flask Response 对象, 其中包含了 JSON 格式的字符串作为其数据。要访问这个数据, 需要先检查响应的状态码, 然后解析响应内容为 JSON
                 img_name = res_data["9"]['images'][0]['filename']
-                # image_url = f'{url}/view?filename={img_name}&subfolder=&type=temp' # 🔥 使用view 接口来获取图片信息
-                view_image_path = f'{url}/view?filename={img_name}' # 🔥 使用view 接口来获取图片信息
-                return view_image_path
-                # print("🌟调试: ", view_image_url)
-    
-				# 🔥请求保存到服务器上的图片地址, 跟从网络上请求图片的逻辑一样！然后可以进一步的取保存为 base64 的图片数据
-                # if res:
-                    # res = requests.get(view_image_url) # print("🌟调试:", res.content[:100]) ## 调试：打印响应内容的前几个字节
-                    # img_encode  = Image.open(io.BytesIO(res.content)) # 将图片转换为二进制流
-                    # final_img = encode_pil_to_base64(img_encode) # 把二进制流编码为 base64 的图片数据
-                    # return final_img # 返回编码后的图片数据流 => 图像数据的 Base64 编码。Base64 是一种编码方法，可以将二进制数据转换成 ASCII 字符串
+                # view_image_path = f'{url}/view?filename={img_name}' # 🔥 使用view 接口来获取图片信息
+                # print("👍 生成了图片:", view_image_path)
+                print("👍 生成了图片: \n", img_name, "\n")
+                
+                # 获得存放图片的文件夹路径
+                username = getpass.getuser() # 获取当前用户名
+                folder_path = f'/Users/{username}/ComfyUI/output'
+                full_imageFile_path = os.path.join(folder_path, img_name)  # 构建图片的完整路径
+                # return full_imageFile_path ## 🌟返回了图片的绝对地址
+                
+                # return view_image_url
+                # 打开文件
+                # img_response = requests.get(url=view_image_path)
+                # 轮询获取 access token
+                
+                # 当 TENAUT_ACCESS_TOKEN 不为 ''
+                if TENAUT_ACCESS_TOKEN:
+                # while True:
+                    # tenant_access_token = get_tenant_access_token()
+                    file_token = upload_file_toBase(img_name, full_imageFile_path, TENAUT_ACCESS_TOKEN) # 使用守护线程每隔 1.5 小时获取一遍 tenant_access_token
+                    if file_token:
+                        response = add_base_record(img_name, file_token, TENAUT_ACCESS_TOKEN)
+                        return response
+     
             except Exception as e:
             	return jsonify({"❌ Error": str(e)}), 500
+    
+
 
 # 初始化 __main__
 if __name__ == "__main__":
-	app.run(port=5000, debug=True)
+ 	# 启动定时任务线程, 不断的获取 token
+    token_thread = threading.Thread(target=get_token_every_90_minutes)
+    token_thread.daemon = True  # 将线程设置为守护线程, 为其他线程或整个程序提供服务
+    token_thread.start()
+ 
+    # 开启服务
+    app.run(port=5000, debug=True)
+	# Thread(target=lambda: app.run(port=5000, debug=True, use_reloader=False)).start() # 独立开个线程运行服务
+ 
+
+ 
+
+
+
 
 

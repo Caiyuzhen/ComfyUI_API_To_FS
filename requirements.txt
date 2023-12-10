@@ -1,3 +1,5 @@
 flask
 flask-sijax
 black # 代码格式化
+load_dotenv # 加载环境变量
+requests-toolbelt # 可以处理上传文件
