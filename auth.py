@@ -14,6 +14,7 @@ APP_SECRET = os.environ.get('APP_SECRET')
 PARENT_NODE = os.environ.get('PARENT_NODE')
 BASE_APP_TOKEN = os.environ.get('BASE_APP_TOKEN')
 BASE_TABLE_ID = os.environ.get('BASE_TABLE_ID')
+WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
 
 
 # 获取 tenant_access_token ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -180,10 +181,10 @@ def get_bot_in_group_info(tenant_access_token):
         print("❌ 群聊消息发送失败", response.status_code)
         print("错误详情：", response.text)  # 打印详细的错误信息
         return jsonify({"error": str(e)}), 500
+ 
     
     
-    
-# 发送消息到指定的群 ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+# 发送消息卡片到指定的群 ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 def send_msg(receive_id, tran_json_string, tenant_access_token):
     # #真实请求地址: #  url = f"https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id"
     url = "https://open.feishu.cn/open-apis/im/v1/messages"
@@ -218,6 +219,43 @@ def send_msg(receive_id, tran_json_string, tenant_access_token):
         print("错误详情：", response.text)  # 打印详细的错误信息
         return jsonify({"error": str(e)}), 500
     
+
+
+# 获得用户 @Bot 的 webhook 消息, 并解析出 content
+def get_webHookMsgAndSendInfo():
+    url = WEBHOOK_URL
+    text_content = None
+    
+    response = requests.request("GET", url)
+    
+    try:
+        if response.status_code == 200:
+            response_data = response.json()
+            print("📤 获得了 webhook 消息: \n", response_data, "\n\n")
+            content_data = response_data['event']['message']['content']
+            
+            # 第一步：解析 JSON 字符串 => 把 str 转为 json
+            parsed_data = json.loads(content_data) # "content": "{\"text\":\"@_user_1 dog\"}",
+            
+            # 第二步：提取 text 字段
+            text = parsed_data['text']
+            
+            # 第三步, 提取出 @ 的人跟 内容
+            parts = text.split(' ', 1)  # 🔥从 ' ' 空格处开始分割, 分割成两部分
+            if len(parts) > 1:
+                text_content = parts[1]
+            else:
+                text_content = ""  # 没有第二部分，设置为空字符串
+            return text_content # 直接返回文本内容
+            # return json.dumps({"user": at_user, "content": text_content}) # 返回 @人 跟内容
+        elif response.status_code == 404:
+            return None
+                
+    except Exception as e:
+        print("❌ webhook 消息获取失败", response.status_code)
+        print("错误详情：", response.text)  # 打印详细的错误信息
+        return jsonify({"error": str(e)}), 500
+        
     
     
     

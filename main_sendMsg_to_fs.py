@@ -60,7 +60,7 @@ def encode_pil_to_base64(image): # 给图像编码
 
 
 
-# 服务的路由
+# 生图服务的路由
 @app.route('/generateA', methods=['POST']) # 访问 🔥 http://127.0.0.1:5000/generate?text=girl
 def index():
     input_text = request.json.get('text') #  从POST数据中获取text参数

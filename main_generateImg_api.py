@@ -43,6 +43,7 @@ def encode_pil_to_base64(image): # 给图像编码
     return base64.b64encode(bytes_data).decode("utf-8")
 
 
+# 生图服务的路由
 @app.route('/generate', methods=['POST']) # 访问 🔥 http://127.0.0.1:5000/generate?text=girl
 def index():
     # text = request.args.get('text')  # 从查询字符串中获取 text 参数 => 🌟 例如 http://127.0.0.1:5000/generate-image?text=girl
