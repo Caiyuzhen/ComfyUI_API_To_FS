@@ -8,13 +8,13 @@ import random
 import getpass
 import threading
 from PIL import Image
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify # 🔥🔥 如果不是 API 的话, 就不能用 jsonify 方法！
 from prompt.prompt import PROMPT
 from threading import Thread
 from datetime import datetime
 from threading import Lock
 from apscheduler.schedulers.background import BackgroundScheduler
-from auth import get_tenant_access_token, upload_img_toIM, get_bot_in_group_info, send_msg, get_webHookMsgAndSendInfo
+from auth import get_tenant_access_token, upload_img_toIM, get_bot_in_group_info, send_msgCard, send_normalMsg, get_webHookMsgAndSendInfo
 
 
 url = "http://127.0.0.1:8188" # comfyUI 的服务器地址
@@ -39,15 +39,15 @@ def get_token_every_90_minutes():
 
 
 # ⌛️ 轮询方法, 等待生图完成
-def check_image_status(prompt_id, timeout=60, interval=2):
-    """检查图片状态, 知道生成完图片或者图片生成超时"""
+def check_image_status(prompt_id, timeout=60, interval=2): # 等待 60s 才超时, 每隔 2s 轮询一次
+    print("☀️ 检查图片状态, 直到生成完图片或者图片生成超时 —————————————————————— ")
     stast_time = time.time()
     while time.time() - stast_time < timeout: # 当前时间 - 开始时间 < 超时时间
         img_response = requests.get(url=f'{url}/history/{prompt_id}') # 请求生图结果
         if img_response.status_code == 200:
             data = img_response.json().get(prompt_id, {}).get('outputs', {}) # 等价于 data = img_response_data.json()[prompt_id], 但这种方式有弊端, 如果 output 不存在会报错  <==  看下返回的 outputs 在哪个节点号！ => 哪个节点有 image
             if data:
-                return jsonify(data) # flask 的 jsonify() 方法可以将字典转换为 json 字符串
+                return json.dumps(data) # 🔥🔥🔥 json.dumps 可以替代 flask API 的 jsonify() 方法 => 将字典转换为 json 字符串
         time.sleep(interval) # 每隔 interval 秒轮询一次
 			
    
@@ -82,16 +82,18 @@ def generate_img():
     global WEBHOOK_DATA, is_Processing # 👈 获得全局变量
     # print("👀 预备生图 -> ", "WEBHOOK_DATA: ", {WEBHOOK_DATA},  "is_Processing: ", {is_Processing}, "\n")
     
+    
     # with lock:
-    print("👀 预备生图 -> ", "WEBHOOK_DATA: ", {WEBHOOK_DATA},  "is_Processing: ", {is_Processing}, "\n")
+    print("👀 预备生图 -> \n ", "WEBHOOK_DATA 🔔 提示词为: ", {WEBHOOK_DATA},  "\n 是否在生图: ", {is_Processing}, "\n")
     if not WEBHOOK_DATA:
         return "❌ 缺少 WEBHOOK_DATA 数据"
-    elif WEBHOOK_DATA: 
-        print("✅ 预备生图 -> ", "WEBHOOK_DATA: ", {WEBHOOK_DATA},  "is_Processing: ", {is_Processing}, "\n")
+    else:  
+        print("✅ 预备生图 -> ", "WEBHOOK_DATA: ", {WEBHOOK_DATA},  "is_Processing: ", {is_Processing}, "\n")    
 		# 更新提示词
         random_number = random.randint(0, 184467470956145)  # 生成一个随机数 665437340080956
         PROMPT["6"]["inputs"]["text"] = WEBHOOK_DATA # 修改传入的传入提示词
         PROMPT["3"]["inputs"]["seed"] = random_number # 修改随机种子参数
+        WEBHOOK_DATA = None # 🔥 清空上一次的提示词
 
 		# 文生图 - 【发送生图请求】 ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
         payload = {"prompt": PROMPT} # 准备好要发送的数据, 把提示词替换为传入的提示词
@@ -101,7 +103,7 @@ def generate_img():
         response = requests.post(url=f'{url}/prompt', json=payload) 
         response_jsonData = response.json() # 不会马上响应, 只会返回个队列 ID , 如果有 id 了则是生成好了图片
 	
-        print("🔥🔥生图任务:", response_jsonData)
+        print("👉👉 生图任务:", response_jsonData)
 
 		#  获得下发的生图任务 id
 		# time.sleep(5)
@@ -109,10 +111,12 @@ def generate_img():
 
 		# 查看下 output
         if prompt_id:
+            print("🚀 获得了生图任务 id: ", {prompt_id})
             try:
+                print("♻️ 开始轮循检查图片状态...")
                 res = ''
                 res = check_image_status(prompt_id)
-                res_data = res.get_json() # 在 Flask 中, 当使用 jsonify() 创建一个响应时，实际上是返回了一个 Flask Response 对象, 其中包含了 JSON 格式的字符串作为其数据。要访问这个数据, 需要先检查响应的状态码, 然后解析响应内容为 JSON
+                res_data = json.loads(res)  # 🔥 将 JSON 字符串转换回字典 => 因为不是 Flask API ！
                 img_name = res_data["9"]['images'][0]['filename']
 				# view_image_path = f'{url}/view?filename={img_name}' # 🔥 使用view 接口来获取图片信息
 				# print("👍 生成了图片:", view_image_path)
@@ -125,38 +129,46 @@ def generate_img():
 				# return full_imageFile_path ## 🌟返回了图片的绝对地址
 
                 if TENAUT_ACCESS_TOKEN:
-                    img_key = upload_img_toIM(full_imageFile_path, TENAUT_ACCESS_TOKEN) # 使用守护线程每隔 1.5 小时获取一遍 tenant_access_token
-                    chat_id = get_bot_in_group_info(TENAUT_ACCESS_TOKEN)
-                    tran_json_string = ''
+                    img_key = upload_img_toIM(full_imageFile_path, TENAUT_ACCESS_TOKEN) # 上传到 IM 的文件夹, 获得图片 key
+                    chat_id = get_bot_in_group_info(TENAUT_ACCESS_TOKEN) # 使用守护线程每隔 1.5 小时获取一遍 tenant_access_token
 				
                     # 打开 json_card 文件
-                    with open("json_card.json", "r") as f:
-                        json_card_origin = json.load(f)
+                    with open("json_card.json", "r") as file:
+                        print("😄 准备发送图片到 IM \n")
+                        json_card_origin = json.load(file)
 					
-						# 修改 json_card 文件内的 img_key
+						# 🔥 修改 json_card 文件内的 img_key
                         json_card_origin["elements"][0]["img_key"] = img_key
 					
-						# 发送群聊消息
-                        res = send_msg(chat_id, json_card_origin, TENAUT_ACCESS_TOKEN)
+						# ✅ 生图完成后发送群聊消息
+                        res = send_msgCard(chat_id, json_card_origin, TENAUT_ACCESS_TOKEN)
                         is_Processing = False # 生图任务完成, 重置标志变量
-                        WEBHOOK_DATA = None # 生图任务完成, 重置 WEBHOOK_DATA
                         return res
             except Exception as e:
+                print("❌ 生图失败", str(e), "\n", response.status_code)
                 return "❌ Error"
     
 
 
-# 通过 WEBHOOK_DATA 以及 is_Processing 来判断是否要执行 generate_img() 函数
+# 判断是否真正执行生图任务, 通过 WEBHOOK_DATA 以及 is_Processing 来判断是否要执行 generate_img() 函数
 def checkFor_RunMainGenerateFn():
     global WEBHOOK_DATA, is_Processing # 👈 获得全局变量
     print("🔒 Check 线程锁 来执行 main -> ", "WEBHOOK_DATA: ", {WEBHOOK_DATA},  "is_Processing: ", {is_Processing}, "\n")
-    
-    with lock:
-        if WEBHOOK_DATA and not is_Processing: # 如果有 WEBHOOK_DATA 数据且没在生图任务
+                
+    with lock:# 获取线程锁, 开始一个 if 后, 其他的就不会执行！！
+        if WEBHOOK_DATA and not is_Processing: # 🌟 如果有 WEBHOOK_DATA 数据且没在生图任务 => 这样就不用回复用户说正在生图, 因为这里就被限制住了
             is_Processing = True # 改变标志变量, 表示正在进行生图任务
             generate_img()  # 调用生成图片的函数
+            
+        # ❌这里有错误，会被线程锁给锁住！
+        if WEBHOOK_DATA and is_Processing: # 如果正在生图, 此时又接到了新的生图请求, 则回条消息给用户说正在生图
+            print("🔄 正在处理另一个生图请求...") 
+            chat_id = get_bot_in_group_info(TENAUT_ACCESS_TOKEN) # 使用守护线程每隔 1.5 小时获取一遍 tenant_access_token
+            with open("json_normalMsg.json", "r") as file: # 打开 json_card 文件, 发送消息给用户说当前有生图任务正在进行
+                msgInfo = json.load(file)
+                send_normalMsg(chat_id, msgInfo, TENAUT_ACCESS_TOKEN)
         else:
-            print(f"{WEBHOOK_DATA} , 为空或者正在进行生图任务")
+            print(f"{WEBHOOK_DATA} , 提示词为空或者正在进行生图任务") 
 
 
 # 初始化 __main__
@@ -170,7 +182,7 @@ if __name__ == "__main__":
 	# 启动定时任务线程, 不断的获取 webhook 数据
     scheduler = BackgroundScheduler() # 创建定时器任务
     scheduler.add_job(refresh_get_webhook_data, 'interval', seconds=5) # 每隔 5s 刷新获得最新的数据
-    scheduler.add_job(checkFor_RunMainGenerateFn, 'interval', seconds=3) # 每隔 3s 刷新获得最新的数据
+    scheduler.add_job(checkFor_RunMainGenerateFn, 'interval', seconds=4) # 每隔 4s 刷新获得最新的数据
     scheduler.start()
  
  

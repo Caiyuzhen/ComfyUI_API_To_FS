@@ -12,7 +12,7 @@ from flask import Flask, request, jsonify
 from prompt.prompt import PROMPT
 from threading import Thread
 from datetime import datetime
-from auth import get_tenant_access_token, upload_img_toIM, get_bot_in_group_info, send_msg
+from auth import get_tenant_access_token, upload_img_toIM, get_bot_in_group_info, send_msgCard
 
 
 url = "http://127.0.0.1:8188" # comfyUI 的服务器地址
@@ -132,7 +132,7 @@ def index():
                         # print("🌟 转换后的 JSON 字符串: \n", tran_json_string, "\n")
                         
                         # 发送群聊消息
-                        res = send_msg(chat_id, json_card_origin, TENAUT_ACCESS_TOKEN)
+                        res = send_msgCard(chat_id, json_card_origin, TENAUT_ACCESS_TOKEN)
                         return res
                         
                         

@@ -44,10 +44,10 @@ def encode_pil_to_base64(image): # 给图像编码
 
 
 # 生图服务的路由
-@app.route('/generate', methods=['POST']) # 访问 🔥 http://127.0.0.1:5000/generate?text=girl
+@app.route('/generate', methods=['POST'])
 def index():
     # text = request.args.get('text')  # 从查询字符串中获取 text 参数 => 🌟 例如 http://127.0.0.1:5000/generate-image?text=girl
-    input_text = request.json.get('text') #  从POST数据中获取text参数
+    input_text = request.json.get('text') #  从 【POST】请求的 【JSON】 数据中获取 【text】 参数,
     # print("拿到了 text :" , input_text)
     
     if not input_text:
@@ -81,6 +81,7 @@ def index():
                 img_name = res_data["9"]['images'][0]['filename']
                 # image_url = f'{url}/view?filename={img_name}&subfolder=&type=temp' # 🔥 使用view 接口来获取图片信息
                 view_image_path = f'{url}/view?filename={img_name}' # 🔥 使用view 接口来获取图片信息
+                print("👍 生成了图片: \n", img_name, "\n")
                 return view_image_path
                 # print("🌟调试: ", view_image_url)
     

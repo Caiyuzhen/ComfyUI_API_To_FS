@@ -1,0 +1,25 @@
+{
+	"zh_cn": {
+		"title": "正在为您生图中...",
+		"content": [
+			[
+				{
+					"tag": "text",
+					"text": "请稍等",
+					"style": ["bold"]
+                  
+				}
+			],
+			[	
+				{
+					"tag": "text",
+					"text": "马上完成"
+				}
+			],
+          	[{
+				"tag": "emotion",
+				"emoji_type": "OneSecond"
+			}]
+		]
+	}
+}
