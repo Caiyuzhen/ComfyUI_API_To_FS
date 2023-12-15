@@ -74,44 +74,22 @@ def refresh_get_webhook_data():
 		if not is_Processing:
 			WEBHOOK_DATA = get_webHookMsgAndSendInfo()
 			print("🔥🔥🔥 WEBHOOK_DATA 已经刷新为: ", WEBHOOK_DATA)
-		else:
-			WEBHOOK_DATA = None
 
-
-
-
-# # 发送 IM 消息说正在生图
-# def senNormalIMInfo():
-# 	global WEBHOOK_DATA, is_Processing
-    
-# 	# ❌这里有错误，会被线程锁给锁住！
-# 	if WEBHOOK_DATA and is_Processing: # 如果正在生图, 此时又接到了新的生图请求, 则回条消息给用户说正在生图
-# 		print("🔄 正在处理另一个生图请求..	🍎🍎🍎🍎🍎🍎🍎🍎🍎 ~~~~~~~") 
-# 		chat_id = get_bot_in_group_info(TENAUT_ACCESS_TOKEN) # 使用守护线程每隔 1.5 小时获取一遍 tenant_access_token
-# 		with open("json_normalMsg.json", "r") as file: # 打开 json_card 文件, 发送消息给用户说当前有生图任务正在进行
-# 			msgInfo = json.load(file)
-# 			send_normalMsg(chat_id, msgInfo, TENAUT_ACCESS_TOKEN)
 
 
 # 生图服务(不通过路由了, 通过 Bot 获得 prompt)
 def generate_img():
     global WEBHOOK_DATA, is_Processing # 👈 获得全局变量
+    
     # print("👀 预备生图 -> ", "WEBHOOK_DATA: ", {WEBHOOK_DATA},  "is_Processing: ", {is_Processing}, "\n")
     
     
     # with lock:
-    print("👀 预备生图 -> \n ", "🔔 提示词为: ", {WEBHOOK_DATA},  "\n 是否在生图: ", {is_Processing}, "\n")
+    print("👀 预备生图 -> \n ", "WEBHOOK_DATA 🔔 提示词为: ", {WEBHOOK_DATA},  "\n 是否在生图: ", {is_Processing}, "\n")
     if not WEBHOOK_DATA:
         return "❌ 缺少 WEBHOOK_DATA 数据"
     else:  
         print("✅ 预备生图 -> ", "WEBHOOK_DATA: ", {WEBHOOK_DATA},  "is_Processing: ", {is_Processing}, "\n")    
-        
-        # 发送 IM 消息说正在生图
-        chat_id = get_bot_in_group_info(TENAUT_ACCESS_TOKEN) # 使用守护线程每隔 1.5 小时获取一遍 tenant_access_token
-        with open("json_normalMsg.json", "r") as file: # 打开 json_card 文件, 发送消息给用户说当前有生图任务正在进行
-            msgInfo = json.load(file)
-            send_normalMsg(chat_id, msgInfo, TENAUT_ACCESS_TOKEN)
-   
 		# 更新提示词
         random_number = random.randint(0, 184467470956145)  # 生成一个随机数 665437340080956
         PROMPT["6"]["inputs"]["text"] = WEBHOOK_DATA # 修改传入的传入提示词
@@ -176,17 +154,16 @@ def generate_img():
 # 判断是否真正执行生图任务, 通过 WEBHOOK_DATA 以及 is_Processing 来判断是否要执行 generate_img() 函数
 def checkFor_RunMainGenerateFn():
     global WEBHOOK_DATA, is_Processing # 👈 获得全局变量
-    print("🔒 Check 线程锁 —————————————————————— \n", "提示词: ", {WEBHOOK_DATA},  "是否正在生图: ", {is_Processing}, "\n")
- 
+    print("🔒 Check 线程锁 来执行 main -> ", "提示词: ", {WEBHOOK_DATA},  "是否正在生图: ", {is_Processing}, "\n")
+                
     with lock:# 获取线程锁, 开始一个 if 后, 其他的就不会执行！！
         if WEBHOOK_DATA and not is_Processing: # 🌟 如果有 WEBHOOK_DATA 数据且没在生图任务 => 这样就不用回复用户说正在生图, 因为这里就被限制住了
             is_Processing = True # 改变标志变量, 表示正在进行生图任务
             generate_img()  # 调用生成图片的函数
             
-
         else:
-            WEBHOOK_DATA = None # 🔥 清空上一次的提示词
-            print(f"提示词为空或者正在进行生图任务") 
+            print(f" 提示词为空或者正在进行生图任务") 
+
 
 
 # 初始化 __main__
@@ -199,8 +176,8 @@ if __name__ == "__main__":
     
 	# 启动定时任务线程, 不断的获取 webhook 数据
     scheduler = BackgroundScheduler() # 创建定时器任务
-    scheduler.add_job(refresh_get_webhook_data, 'interval', seconds=10) # 每隔 10s 刷新获得最新的数据
-    scheduler.add_job(checkFor_RunMainGenerateFn, 'interval', seconds=2) # 每隔 2s 刷新看是否应该继续生图
+    scheduler.add_job(refresh_get_webhook_data, 'interval', seconds=5) # 每隔 5s 刷新获得最新的数据
+    scheduler.add_job(checkFor_RunMainGenerateFn, 'interval', seconds=4) # 每隔 4s 刷新获得最新的数据
     scheduler.start()
  
  
