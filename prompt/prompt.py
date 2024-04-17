@@ -28,7 +28,7 @@ PROMPT = {
   },
   "4": {
     "inputs": {
-      "ckpt_name": "3d_Toon_Diffusion_XL.fp16.safetensors"
+      "ckpt_name": "revAnimated_v122.safetensors"
     },
     "class_type": "CheckpointLoaderSimple"
   },
